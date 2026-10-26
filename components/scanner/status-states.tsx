@@ -1,15 +1,37 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { AlertTriangle, Loader2, type LucideIcon } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
+function useElapsedSeconds() {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setSeconds((s) => s + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  return seconds
+}
+
+function formatElapsed(seconds: number) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
 export function PendingState({ title, description }: { title: string; description: string }) {
+  const elapsed = useElapsedSeconds()
   return (
     <Card>
       <CardContent className="flex items-center gap-4 py-6" role="status" aria-live="polite">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/30">
           <Loader2 className="size-6 animate-spin text-primary" aria-hidden="true" />
         </div>
-        <div>
-          <p className="font-medium">{title}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-4">
+            <p className="font-medium">{title}</p>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground" aria-hidden="true">
+              {formatElapsed(elapsed)}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       </CardContent>

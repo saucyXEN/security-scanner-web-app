@@ -15,7 +15,7 @@ export function UrlScan() {
   const [lastUrl, setLastUrl] = useState('')
   const { trigger, data, error, isMutating, reset } = useSWRMutation('/api/scan/url', postJson<ScanResponse>)
   const analysisId = data?.status === 'queued' ? data.analysisId : null
-  const { analysis, analysisError } = useAnalysis(analysisId)
+  const { analysis, analysisError, rateLimited } = useAnalysis(analysisId)
 
   const result = data?.status === 'completed' ? data : analysis?.status === 'completed' ? analysis : null
   const pending = isMutating || (!!analysisId && !result && !analysisError)
@@ -67,7 +67,11 @@ export function UrlScan() {
       ) : pending ? (
         <PendingState
           title={isMutating ? 'Submitting URL to VirusTotal…' : 'Analysis in progress'}
-          description="Security vendors are analyzing the URL. This usually takes 15–60 seconds."
+          description={
+            rateLimited
+              ? 'VirusTotal rate limit reached — waiting and retrying automatically.'
+              : 'Security vendors are analyzing the URL. This usually takes 15–60 seconds.'
+          }
         />
       ) : (
         <EmptyState

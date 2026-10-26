@@ -11,13 +11,18 @@ import { ScanResult } from './scan-result'
 import { EmptyState, ErrorState, PendingState } from './status-states'
 
 const MAX_BYTES = 32 * 1024 * 1024
+// Only pre-hash large files: skipping the upload is worth an extra API call
+// there, while for small files it just doubles the VirusTotal requests.
+const PREFLIGHT_BYTES = 2 * 1024 * 1024
 
 async function scanFile(_key: string, { arg: file }: { arg: File }): Promise<ScanResponse> {
   if (file.size > MAX_BYTES) throw new Error('File is larger than the 32 MB upload limit.')
 
-  const hash = await sha256Hex(file)
-  const known = await parseJson<ScanResponse | { status: 'unknown' }>(await fetch(`/api/scan/file?hash=${hash}`))
-  if (known.status === 'completed') return known
+  if (file.size > PREFLIGHT_BYTES) {
+    const hash = await sha256Hex(file)
+    const known = await parseJson<ScanResponse | { status: 'unknown' }>(await fetch(`/api/scan/file?hash=${hash}`))
+    if (known.status === 'completed') return known
+  }
 
   const form = new FormData()
   form.append('file', file)
@@ -36,7 +41,7 @@ export function FileScan() {
   const [dragging, setDragging] = useState(false)
   const { trigger, data, error, isMutating, reset } = useSWRMutation('/api/scan/file', scanFile)
   const analysisId = data?.status === 'queued' ? data.analysisId : null
-  const { analysis, analysisError } = useAnalysis(analysisId)
+  const { analysis, analysisError, rateLimited } = useAnalysis(analysisId)
 
   const result = data?.status === 'completed' ? data : analysis?.status === 'completed' ? analysis : null
   const pending = isMutating || (!!analysisId && !result && !analysisError)
@@ -123,7 +128,11 @@ export function FileScan() {
       ) : pending ? (
         <PendingState
           title={isMutating ? 'Hashing and uploading file…' : 'Analysis in progress'}
-          description="Security vendors are scanning the file. New files can take 1–3 minutes."
+          description={
+            rateLimited
+              ? 'VirusTotal rate limit reached — waiting and retrying automatically.'
+              : 'Security vendors are scanning the file. Files VirusTotal has not seen before take 1–3 minutes.'
+          }
         />
       ) : (
         !file && (

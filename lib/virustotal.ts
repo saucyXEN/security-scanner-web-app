@@ -22,12 +22,21 @@ function apiKey() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = any
 
-export async function vtFetch(path: string, init: RequestInit = {}): Promise<Json | null> {
-  const res = await fetch(`${VT_BASE}${path}`, {
-    ...init,
-    headers: { 'x-apikey': apiKey(), accept: 'application/json', ...init.headers },
-    cache: 'no-store',
-  })
+export async function vtFetch(path: string, init: RequestInit = {}, timeoutMs = 30_000): Promise<Json | null> {
+  let res: Response
+  try {
+    res = await fetch(`${VT_BASE}${path}`, {
+      ...init,
+      headers: { 'x-apikey': apiKey(), accept: 'application/json', ...init.headers },
+      cache: 'no-store',
+      signal: init.signal ?? AbortSignal.timeout(timeoutMs),
+    })
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      throw new VTError('VirusTotal did not respond in time. Please try again.', 504)
+    }
+    throw new VTError('Could not reach VirusTotal. Check the server network connection.', 502)
+  }
 
   if (res.status === 404) return null
 

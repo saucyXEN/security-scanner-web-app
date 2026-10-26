@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const upload = new FormData()
     upload.append('file', new Blob([buffer]), file.name || 'upload.bin')
-    const submitted = await vtFetch('/files', { method: 'POST', body: upload })
+    const submitted = await vtFetch('/files', { method: 'POST', body: upload }, 120_000)
     return Response.json({ status: 'queued', analysisId: submitted?.data?.id } satisfies ScanResponse)
   } catch (error) {
     return errorResponse(error)

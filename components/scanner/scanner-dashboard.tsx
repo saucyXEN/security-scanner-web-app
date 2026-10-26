@@ -91,7 +91,7 @@ export function ScannerDashboard() {
           <span>
             <span className="text-white">HACKERADE</span> {'// threat intelligence console'}
           </span>
-          <span>SAUCY · ZISHAN · MOBASSAR</span>
+          <span>SAUCY</span>
         </div>
       </footer>
     </div>
