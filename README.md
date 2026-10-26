@@ -76,6 +76,25 @@ start.bat --no-browser  :: start without opening a browser
 
 Press `Ctrl+C` in that window to stop the server.
 
+### Linux / macOS launcher
+
+`start.bat` is Windows-only. Use the included shell script instead:
+
+```bash
+chmod +x start.sh     # once, if it is not executable after cloning
+./start.sh            # start + open browser
+./start.sh --no-browser
+```
+
+It does the same job as the `.bat`: installs dependencies if needed, reuses an already running server, opens the browser once the app is ready, and retries if Next.js stops for its upgrade reminder. On a headless VM (no desktop) it just prints the URL instead of opening a browser.
+
+Or run the server directly, which is all the script really does:
+
+```bash
+npm run dev
+```
+
+
 ## Scripts
 
 | Command | Description |
@@ -84,6 +103,7 @@ Press `Ctrl+C` in that window to stop the server.
 | `npm run build` | Production build |
 | `npm start` | Serve the production build |
 | `start.bat` | Windows launcher (dev server + browser) |
+| `./start.sh` | Linux / macOS launcher (dev server + browser) |
 
 There is no test or lint script configured.
 
@@ -141,6 +161,7 @@ lib/
   api-client.ts               fetch helpers, SWR hooks, polling policy
   types.ts                    shared types
 start.bat                     Windows launcher
+start.sh                      Linux / macOS launcher
 render.yaml                   Render deployment config
 ```
 
