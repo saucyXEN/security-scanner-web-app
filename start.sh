@@ -23,11 +23,6 @@ for arg in "$@"; do
   esac
 done
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "[error] Node.js was not found. Install it from https://nodejs.org and try again."
-  exit 1
-fi
-
 # True when something is already listening on the port.
 is_up() {
   (exec 3<>"/dev/tcp/127.0.0.1/${PORT}") >/dev/null 2>&1
@@ -45,6 +40,7 @@ open_url() {
   fi
 }
 
+# A server is already up: no Node.js needed, just open the page.
 if is_up; then
   echo "[info] Scanner is already running at $URL"
   if [ "$OPEN_BROWSER" -eq 1 ]; then
@@ -54,6 +50,60 @@ if is_up; then
     echo "[info] Browser skipped because --no-browser was passed."
   fi
   exit 0
+fi
+
+node_ok() {
+  command -v node >/dev/null 2>&1 &&
+    node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)' >/dev/null 2>&1
+}
+
+load_nvm() {
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # shellcheck disable=SC1091
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+}
+
+install_node() {
+  echo "[setup] Node.js 20+ was not found."
+  load_nvm
+
+  if ! command -v nvm >/dev/null 2>&1; then
+    echo "[setup] Installing nvm (user-level, no root required)..."
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    else
+      echo "[error] curl or wget is required to install Node.js automatically."
+      return 1
+    fi
+    load_nvm
+  fi
+
+  command -v nvm >/dev/null 2>&1 || return 1
+
+  echo "[setup] Installing Node.js 22 LTS (this happens once)..."
+  nvm install 22 && nvm use 22 >/dev/null
+}
+
+if ! node_ok; then
+  if ! install_node; then
+    cat <<'EOF'
+
+[error] Node.js 20+ is required to run this app, and the automatic install failed.
+
+Options:
+  1. Install Node.js yourself from https://nodejs.org/en/download, or with nvm:
+       curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+       nvm install 22
+  2. Run the scanner on another machine (e.g. your Windows host with start.bat)
+     and open http://<host-ip>:3000 from this machine's browser. No Node.js is
+     needed on this machine for that.
+
+EOF
+    exit 1
+  fi
+  node_ok || { echo "[error] Node.js install did not complete."; exit 1; }
 fi
 
 if [ ! -d "node_modules" ]; then

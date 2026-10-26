@@ -88,6 +88,8 @@ chmod +x start.sh     # once, if it is not executable after cloning
 
 It does the same job as the `.bat`: installs dependencies if needed, reuses an already running server, opens the browser once the app is ready, and retries if Next.js stops for its upgrade reminder. On a headless VM (no desktop) it just prints the URL instead of opening a browser.
 
+If Node.js is missing it installs Node.js 22 LTS automatically with [nvm](https://github.com/nvm-sh/nvm) (user-level, no root needed). If that is not possible it prints the options, including running the scanner on another machine and opening `http://<host-ip>:3000` from this one — that needs no Node.js on the client machine.
+
 Or run the server directly, which is all the script really does:
 
 ```bash
