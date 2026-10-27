@@ -176,6 +176,58 @@ export function reportFromAnalysis(body: Json): ScanResponse {
   }
 }
 
+// VirusTotal's standard /files endpoint accepts files up to 32 MB. Larger
+// samples must go through /files/upload_url (premium API plans).
+const DIRECT_UPLOAD_BYTES = 32 * 1024 * 1024
+
+export async function lookupFileReport(sha256: string): Promise<ScanResponse | null> {
+  const existing = await vtFetch(`/files/${sha256}`)
+  if (!existing?.data?.attributes?.last_analysis_date) return null
+  return reportFromObject(existing.data, 'file')
+}
+
+export async function submitFile(buffer: Buffer, fileName: string): Promise<ScanResponse> {
+  const form = new FormData()
+  form.append('file', new Blob([buffer]), fileName || 'upload.bin')
+
+  if (buffer.length <= DIRECT_UPLOAD_BYTES) {
+    const submitted = await vtFetch('/files', { method: 'POST', body: form }, 300_000)
+    if (!submitted?.data?.id) throw new VTError('VirusTotal did not accept the file.', 502)
+    return { status: 'queued', analysisId: submitted.data.id }
+  }
+
+  const slot = await vtFetch('/files/upload_url')
+  const uploadUrl = typeof slot?.data === 'string' ? slot.data : null
+  if (!uploadUrl) {
+    throw new VTError('VirusTotal did not return an upload URL for this large file.', 502)
+  }
+
+  let res: Response
+  try {
+    // Even the pre-signed large-file URL still requires the API key header.
+    res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { 'x-apikey': apiKey() },
+      body: form,
+      signal: AbortSignal.timeout(600_000),
+    })
+  } catch {
+    throw new VTError('Could not upload the large file to VirusTotal.', 502)
+  }
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new VTError(
+      body?.error?.message ??
+        body?.errors?.[0]?.detail ??
+        `VirusTotal large-file upload failed (${res.status}).`,
+      502,
+    )
+  }
+  const analysisId = body?.data?.id
+  if (!analysisId) throw new VTError('VirusTotal did not return an analysis id.', 502)
+  return { status: 'queued', analysisId }
+}
+
 export function errorResponse(error: unknown) {
   if (error instanceof VTError) {
     return Response.json({ error: error.message }, { status: error.status })

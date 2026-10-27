@@ -5,8 +5,9 @@ import { ExternalLink, Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import type { EngineResult, ScanResponse } from '@/lib/types'
+import type { EngineResult, PdfReportInput, ScanResponse } from '@/lib/types'
 import { VERDICT_META, VerdictBadge } from './verdict-badge'
+import { PdfButton } from './pdf-button'
 
 type Completed = Extract<ScanResponse, { status: 'completed' }>
 
@@ -20,10 +21,14 @@ export function ScanResult({
   result,
   onRescan,
   rescanning,
+  pdfReport,
+  pdfFileName,
 }: {
   result: Completed
   onRescan?: () => void
   rescanning?: boolean
+  pdfReport?: PdfReportInput
+  pdfFileName?: string
 }) {
   const meta = VERDICT_META[result.verdict]
   const Icon = meta.icon
@@ -64,6 +69,9 @@ export function ScanResult({
                   {rescanning ? <Loader2 className="animate-spin" /> : <RefreshCw />}
                   Rescan
                 </Button>
+              )}
+              {pdfReport && (
+                <PdfButton report={pdfReport} fileName={pdfFileName ?? 'hackerade-report.pdf'} />
               )}
               {result.permalink && (
                 <Button

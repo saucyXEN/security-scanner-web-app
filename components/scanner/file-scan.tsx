@@ -2,60 +2,53 @@
 
 import { useRef, useState, type DragEvent } from 'react'
 import useSWRMutation from 'swr/mutation'
-import { FileSearch, FileUp, Loader2, X } from 'lucide-react'
+import { FileSearch, FileUp, Loader2, ShieldCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { parseJson, sha256Hex, useAnalysis } from '@/lib/api-client'
-import type { ScanResponse } from '@/lib/types'
-import { ScanResult } from './scan-result'
+import { parseJson, useAnalysis } from '@/lib/api-client'
+import type { DeepScanResponse } from '@/lib/types'
+import { formatBytes } from '@/lib/report'
+import { DeepResult } from './deep-result'
 import { EmptyState, ErrorState, PendingState } from './status-states'
 
-const MAX_BYTES = 32 * 1024 * 1024
-// Only pre-hash large files: skipping the upload is worth an extra API call
-// there, while for small files it just doubles the VirusTotal requests.
-const PREFLIGHT_BYTES = 2 * 1024 * 1024
+// The local analysis runs on our own server, so any file size works. VirusTotal
+// adds multi-engine results when a key is configured.
+const MAX_BYTES = 200 * 1024 * 1024
+const LARGE_BYTES = 32 * 1024 * 1024
 
-async function scanFile(_key: string, { arg: file }: { arg: File }): Promise<ScanResponse> {
-  if (file.size > MAX_BYTES) throw new Error('File is larger than the 32 MB upload limit.')
-
-  if (file.size > PREFLIGHT_BYTES) {
-    const hash = await sha256Hex(file)
-    const known = await parseJson<ScanResponse | { status: 'unknown' }>(await fetch(`/api/scan/file?hash=${hash}`))
-    if (known.status === 'completed') return known
-  }
+async function deepScan(_key: string, { arg }: { arg: { file: File; vt: boolean } }): Promise<DeepScanResponse> {
+  if (arg.file.size > MAX_BYTES) throw new Error('File is larger than the 200 MB analysis limit.')
 
   const form = new FormData()
-  form.append('file', file)
-  return parseJson<ScanResponse>(await fetch('/api/scan/file', { method: 'POST', body: form }))
-}
-
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  form.append('file', arg.file)
+  form.append('vt', arg.vt ? 'on' : 'off')
+  return parseJson<DeepScanResponse>(await fetch('/api/scan/deep', { method: 'POST', body: form }))
 }
 
 export function FileScan() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
-  const { trigger, data, error, isMutating, reset } = useSWRMutation('/api/scan/file', scanFile)
-  const analysisId = data?.status === 'queued' ? data.analysisId : null
-  const { analysis, analysisError, rateLimited } = useAnalysis(analysisId)
+  const [submitToVirusTotal, setSubmitToVirusTotal] = useState(true)
+  const { trigger, data, error, isMutating, reset } = useSWRMutation('/api/scan/deep', deepScan)
 
-  const result = data?.status === 'completed' ? data : analysis?.status === 'completed' ? analysis : null
-  const pending = isMutating || (!!analysisId && !result && !analysisError)
+  const queuedId = data?.vt?.status === 'queued' ? data.vt.analysisId : null
+  const { analysis: polledVt, analysisError, rateLimited } = useAnalysis(queuedId)
 
-  const select = (f: File | undefined) => {
-    if (!f) return
+  const vt = polledVt?.status === 'completed' ? polledVt : (data?.vt ?? null)
+  const vtPending = vt?.status === 'queued'
+  const vtError = data?.vtError ?? (analysisError ? analysisError.message : null)
+
+  const select = (next: File | undefined) => {
+    if (!next) return
     reset()
-    setFile(f)
+    setFile(next)
   }
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault()
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault()
     setDragging(false)
-    select(e.dataTransfer.files?.[0])
+    select(event.dataTransfer.files?.[0])
   }
 
   const clear = () => {
@@ -69,8 +62,8 @@ export function FileScan() {
       <div className="flex flex-col gap-3">
         <label
           htmlFor="file-input"
-          onDragOver={(e) => {
-            e.preventDefault()
+          onDragOver={(event) => {
+            event.preventDefault()
             setDragging(true)
           }}
           onDragLeave={() => setDragging(false)}
@@ -83,16 +76,22 @@ export function FileScan() {
           <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/30">
             <FileUp className="size-6 text-primary" aria-hidden="true" />
           </div>
-          <div>
+          <div className="flex flex-col gap-1">
             <p className="font-medium">Drop a file here or click to browse</p>
-            <p className="text-sm text-muted-foreground">Max 32 MB. Files are hashed first — known files are not re-uploaded.</p>
+            <p className="text-sm text-muted-foreground">
+              Up to 200 MB — including files over the 32 MB VirusTotal limit.
+            </p>
+            <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="size-3.5" aria-hidden="true" />
+              Offline static analysis: the file is never executed, and no API key is needed.
+            </p>
           </div>
           <input
             ref={inputRef}
             id="file-input"
             type="file"
             className="sr-only"
-            onChange={(e) => select(e.target.files?.[0])}
+            onChange={(event) => select(event.target.files?.[0])}
           />
         </label>
 
@@ -102,18 +101,37 @@ export function FileScan() {
               <FileSearch className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{file.name}</p>
-                <p className="text-xs text-muted-foreground">{formatSize(file.size)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatBytes(file.size)}
+                  {file.size > LARGE_BYTES && ' · large file: offline analysis always runs'}
+                </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={clear} disabled={isMutating}>
-                <X />
-                Remove
-              </Button>
-              <Button size="sm" onClick={() => trigger(file).catch(() => {})} disabled={pending}>
-                {pending ? <Loader2 className="animate-spin" /> : <FileSearch />}
-                Scan file
-              </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={submitToVirusTotal}
+                  onChange={(event) => setSubmitToVirusTotal(event.target.checked)}
+                  disabled={isMutating}
+                  className="size-3.5 accent-white"
+                />
+                Submit to VirusTotal
+              </label>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={clear} disabled={isMutating}>
+                  <X />
+                  Remove
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => trigger({ file, vt: submitToVirusTotal }).catch(() => {})}
+                  disabled={isMutating}
+                >
+                  {isMutating ? <Loader2 className="animate-spin" /> : <FileSearch />}
+                  Scan file
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -121,27 +139,28 @@ export function FileScan() {
 
       {error ? (
         <ErrorState message={error.message} />
-      ) : analysisError ? (
-        <ErrorState message={analysisError.message} />
-      ) : result ? (
-        <ScanResult result={result} />
-      ) : pending ? (
+      ) : isMutating ? (
         <PendingState
-          title={isMutating ? 'Hashing and uploading file…' : 'Analysis in progress'}
-          description={
-            rateLimited
-              ? 'VirusTotal rate limit reached — waiting and retrying automatically.'
-              : 'Security vendors are scanning the file. Files VirusTotal has not seen before take 1–3 minutes.'
-          }
+          title={file && file.size > LARGE_BYTES ? 'Analyzing large file locally…' : 'Analyzing file locally…'}
+          description="Hashes, entropy, embedded commands and file structure are checked on this server. Nothing is executed and no internet is required."
         />
+      ) : data ? (
+        <DeepResult data={data} vt={vt} vtError={vtError} vtPending={vtPending} />
       ) : (
         !file && (
           <EmptyState
             icon={FileSearch}
             title="Scan a suspicious file"
-            description="Upload an executable, document or archive to check it against 70+ antivirus engines."
+            description="Any executable, document, script or archive up to 200 MB. The local engine works offline; VirusTotal adds 70+ antivirus engines when configured."
           />
         )
+      )}
+
+      {rateLimited && data && (
+        <p className="text-xs text-muted-foreground">
+          VirusTotal rate limit reached — the local analysis above is already complete, and the multi-engine result will
+          keep retrying automatically.
+        </p>
       )}
     </div>
   )

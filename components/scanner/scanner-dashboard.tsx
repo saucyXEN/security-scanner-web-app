@@ -1,14 +1,26 @@
 'use client'
 
-import { FileSearch, Link2, Radar } from 'lucide-react'
+import { FileSearch, Link2, Radar, ScanSearch } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { UrlScan } from './url-scan'
 import { FileScan } from './file-scan'
+import { OsintPanel } from './osint-panel'
 import { ReconPanel } from './recon-panel'
 
 const TABS = [
   { value: 'url', label: 'URL Scan', icon: Link2, description: 'Check a link against antivirus engines and blocklists.' },
-  { value: 'file', label: 'File Scan', icon: FileSearch, description: 'Detect malware in executables, documents and archives.' },
+  {
+    value: 'file',
+    label: 'File Scan',
+    icon: FileSearch,
+    description: 'Offline static analysis for files up to 200 MB, plus VirusTotal engines when configured.',
+  },
+  {
+    value: 'osint',
+    label: 'OSINT',
+    icon: ScanSearch,
+    description: 'Shodan host intel: open ports, services, CVEs, DNS and deep search for an IP or domain.',
+  },
   { value: 'recon', label: 'Recon', icon: Radar, description: 'WHOIS, subdomains, DNS records and contacts for a domain.' },
 ] as const
 
@@ -80,6 +92,7 @@ export function ScannerDashboard() {
               </p>
               {value === 'url' && <UrlScan />}
               {value === 'file' && <FileScan />}
+              {value === 'osint' && <OsintPanel />}
               {value === 'recon' && <ReconPanel />}
             </TabsContent>
           ))}

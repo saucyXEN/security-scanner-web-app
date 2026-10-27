@@ -6,6 +6,7 @@ import { Globe, Link2, Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { postJson, useAnalysis } from '@/lib/api-client'
+import { scanPdfReport } from '@/lib/report'
 import type { ScanResponse } from '@/lib/types'
 import { ScanResult } from './scan-result'
 import { EmptyState, ErrorState, PendingState } from './status-states'
@@ -63,7 +64,13 @@ export function UrlScan() {
       ) : analysisError ? (
         <ErrorState message={analysisError.message} />
       ) : result ? (
-        <ScanResult result={result} onRescan={() => scan(lastUrl, true)} rescanning={pending} />
+        <ScanResult
+          result={result}
+          onRescan={() => scan(lastUrl, true)}
+          rescanning={pending}
+          pdfReport={scanPdfReport('url', lastUrl, result)}
+          pdfFileName="hackerade-url-report.pdf"
+        />
       ) : pending ? (
         <PendingState
           title={isMutating ? 'Submitting URL to VirusTotal…' : 'Analysis in progress'}

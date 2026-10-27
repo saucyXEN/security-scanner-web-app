@@ -70,3 +70,112 @@ export interface ReconResponse {
   dns: DnsRecords
   contacts: ContactInfo[]
 }
+
+export type Severity = 'high' | 'medium' | 'low' | 'info'
+
+export interface Finding {
+  severity: Severity
+  title: string
+  detail: string
+}
+
+export interface StaticAnalysis {
+  status: 'completed'
+  fileName: string
+  size: number
+  sha256: string
+  md5: string
+  fileType: string
+  extension: string
+  entropy: number
+  verdict: Verdict
+  score: number
+  findings: Finding[]
+  indicators: {
+    urls: string[]
+    ips: string[]
+    emails: string[]
+    commands: string[]
+  }
+  pe: {
+    format: string
+    machine: string
+    sections: number
+    packed: boolean
+    subsystem: string | null
+  } | null
+  offline: true
+}
+
+export interface DeepScanResponse {
+  analysis: StaticAnalysis
+  vt: ScanResponse | null
+  vtError: string | null
+}
+
+export interface OsintService {
+  port: number
+  transport: string
+  product: string | null
+  version: string | null
+  banner: string | null
+}
+
+export interface OsintHost {
+  ip: string
+  hostnames: string[]
+  org: string | null
+  isp: string | null
+  asn: string | null
+  country: string | null
+  city: string | null
+  os: string | null
+  ports: number[]
+  services: OsintService[]
+  vulns: string[]
+  tags: string[]
+}
+
+export interface OsintDnsRecord {
+  type: string
+  value: string
+  firstSeen: string | null
+  lastSeen: string | null
+}
+
+export interface OsintDns {
+  domain: string
+  subdomains: string[]
+  records: OsintDnsRecord[]
+  tags: string[]
+}
+
+export interface OsintSearchMatch {
+  ip: string
+  port: number
+  hostname: string | null
+  product: string | null
+  org: string | null
+  country: string | null
+}
+
+export interface OsintResponse {
+  target: string
+  resolvedIp: string | null
+  host: OsintHost | null
+  dns: OsintDns | null
+  search: { total: number; matches: OsintSearchMatch[]; error: string | null } | null
+  errors: string[]
+}
+
+export interface PdfSection {
+  heading: string
+  rows?: [string, string][]
+  text?: string
+}
+
+export interface PdfReportInput {
+  title: string
+  subtitle?: string
+  sections: PdfSection[]
+}
