@@ -96,6 +96,17 @@ Or run the server directly, which is all the script really does:
 npm run dev
 ```
 
+### Python launcher
+
+If you would rather not deal with bash or nvm, use the dependency-free Python 3 launcher:
+
+```bash
+python3 start.py                 # start + open browser
+python3 start.py --no-browser    # start only
+```
+
+When Node.js 20+ is missing on Linux/macOS, `start.py` downloads a private Node.js 22 LTS build into `~/.cache/hackerade-node` (no root required) and uses it for this project only. Note that the app itself still runs on Node.js — Python only replaces the launcher, not the runtime.
+
 
 ## Scripts
 
@@ -106,6 +117,7 @@ npm run dev
 | `npm start` | Serve the production build |
 | `start.bat` | Windows launcher (dev server + browser) |
 | `./start.sh` | Linux / macOS launcher (dev server + browser) |
+| `python3 start.py` | Python 3 launcher, bootstraps Node.js if missing |
 
 There is no test or lint script configured.
 
@@ -164,6 +176,7 @@ lib/
   types.ts                    shared types
 start.bat                     Windows launcher
 start.sh                      Linux / macOS launcher
+start.py                      Python 3 launcher (bootstraps Node.js)
 render.yaml                   Render deployment config
 ```
 
