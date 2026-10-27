@@ -138,8 +138,6 @@ export function DeepResult({
 
       <IndicatorCard data={data} />
 
-      <AiInsight context={deepAiContext({ ...data, vt, vtError })} />
-
       <section className="flex flex-col gap-3">
         <p className="eyebrow">
           <span className="text-white">{'//'}</span> VirusTotal multi-engine scan
@@ -160,6 +158,8 @@ export function DeepResult({
           </Card>
         ) : null}
       </section>
+
+      <AiInsight context={deepAiContext({ ...data, vt, vtError })} />
     </div>
   )
 }
